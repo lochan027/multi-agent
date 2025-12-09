@@ -49,9 +49,19 @@ export interface SystemSettings {
   requireApproval: boolean;
 }
 
+export interface Activity {
+  id: string;
+  agent: string;
+  action: string;
+  details: string;
+  status: 'success' | 'error' | 'info';
+  timestamp: number;
+}
+
 export const useAgentData = () => {
   const [agents, setAgents] = useState<AgentStatus[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [systemRunning, setSystemRunning] = useState(false);
   const [systemStats, setSystemStats] = useState<SystemStats>({
     totalScans: 0,
@@ -102,6 +112,16 @@ export const useAgentData = () => {
       setOpportunities(response.data);
     } catch (error) {
       console.error('Error fetching opportunities:', error);
+    }
+  }, []);
+
+  // Fetch activities
+  const fetchActivities = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api-activities`);
+      setActivities(response.data);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
     }
   }, []);
 
@@ -175,20 +195,23 @@ export const useAgentData = () => {
     fetchStatus();
     fetchAgents();
     fetchOpportunities();
+    fetchActivities();
 
     // Set up polling
     const intervalId = setInterval(() => {
       fetchStatus();
       fetchAgents();
       fetchOpportunities();
+      fetchActivities();
     }, POLL_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, [fetchStatus, fetchAgents, fetchOpportunities]);
+  }, [fetchStatus, fetchAgents, fetchOpportunities, fetchActivities]);
 
   return {
     agents,
     opportunities,
+    activities,
     systemRunning,
     systemStats,
     systemSettings,

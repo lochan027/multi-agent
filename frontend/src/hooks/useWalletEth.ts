@@ -27,21 +27,7 @@ declare global {
 
 export const useWallet = () => {
   const [wallet, setWallet] = useState<WalletState>(() => {
-    // Try to restore wallet state from localStorage
-    const saved = localStorage.getItem('wallet_state');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return {
-          address: null,
-          balance: null,
-          chainId: null,
-          connected: false,
-          isConnecting: false,
-        };
-      }
-    }
+    // Don't restore wallet state - require manual connection
     return {
       address: null,
       balance: null,
@@ -52,15 +38,6 @@ export const useWallet = () => {
   });
 
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
-
-  // Save wallet state to localStorage whenever it changes
-  useEffect(() => {
-    if (wallet.connected) {
-      localStorage.setItem('wallet_state', JSON.stringify(wallet));
-    } else {
-      localStorage.removeItem('wallet_state');
-    }
-  }, [wallet]);
 
   // Check if MetaMask is installed
   const isMetaMaskInstalled = (): boolean => {
@@ -117,6 +94,8 @@ export const useWallet = () => {
     setWallet(prev => ({ ...prev, isConnecting: true }));
 
     try {
+      // Clear any previous errors
+      console.clear();
       // Request account access
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',

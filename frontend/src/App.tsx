@@ -11,11 +11,28 @@ import { useWallet } from './hooks/useWalletEth';
 import { useAgentData } from './hooks/useAgentDataNetlify';
 import type { ArbitrageOpportunity } from './types';
 
+// Suppress wallet connection errors in console
+if (typeof window !== 'undefined') {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    // Suppress MetaMask/wallet related errors
+    const errorString = args.join(' ');
+    if (errorString.includes('wallet') || 
+        errorString.includes('ethereum') || 
+        errorString.includes('MetaMask') ||
+        args[0]?.code === 403) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+}
+
 function App() {
   const wallet = useWallet();
   const { 
     agents: agentStatuses, 
-    opportunities: rawOpportunities, 
+    opportunities: rawOpportunities,
+    activities,
     systemRunning, 
     systemStats: stats, 
     systemSettings: settingsFromBackend,
@@ -167,7 +184,10 @@ function App() {
       <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setShowLanding(true)}
+            >
               <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2 rounded-lg">
                 <BarChart3 className="w-6 h-6" />
               </div>
@@ -281,26 +301,71 @@ function App() {
             </div>
           </div>
 
-          {/* System Info */}
-          <div>
-            <h2 className="text-2xl font-bold mb-4">System Info</h2>
-            <div className="card p-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Status</span>
-                  <span className={systemRunning ? "text-green-400" : "text-gray-400"}>
-                    {systemRunning ? 'Running' : 'Stopped'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Backend</span>
-                  <span className={connected ? "text-green-400" : "text-red-400"}>
-                    {connected ? 'Connected' : 'Offline'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Network</span>
-                  <span className="text-blue-400">Ethereum Mainnet</span>
+          {/* Activity Log and System Info */}
+          <div className="space-y-8">
+            {/* Activity Log */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Activity Log</h2>
+              <div className="card p-4 max-h-[350px] overflow-y-auto">
+                {!activities || activities.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No activity yet</p>
+                    <p className="text-sm mt-1">Start the system to see agent activities</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activities.map((activity) => (
+                      <div
+                        key={activity.id}
+                        className="border-l-2 border-slate-700 pl-4 pb-3 last:pb-0"
+                      >
+                        <div className="flex items-start justify-between mb-1">
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            activity.status === 'success' ? 'bg-green-500/20 text-green-400' :
+                            activity.status === 'error' ? 'bg-red-500/20 text-red-400' :
+                            'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {activity.agent}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(activity.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <p className="font-semibold text-sm">{activity.action}</p>
+                        <p className="text-xs text-gray-400 mt-1">{activity.details}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* System Info */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">System Info</h2>
+              <div className="card p-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Status</span>
+                    <span className={systemRunning ? "text-green-400 font-semibold" : "text-gray-400"}>
+                      {systemRunning ? '● Running' : '○ Stopped'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Backend</span>
+                    <span className={connected ? "text-green-400" : "text-red-400"}>
+                      {connected ? '● Connected' : '○ Offline'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Network</span>
+                    <span className="text-blue-400">Ethereum Mainnet</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Uptime</span>
+                    <span className="text-white">{Math.floor(stats.uptime / 60)}m {stats.uptime % 60}s</span>
+                  </div>
                 </div>
               </div>
             </div>

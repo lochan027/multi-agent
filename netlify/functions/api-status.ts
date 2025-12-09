@@ -4,28 +4,7 @@
  */
 
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-
-// In-memory state (Note: This resets on cold starts, consider using a database for production)
-const systemState = {
-  running: false,
-  stats: {
-    totalScans: 0,
-    opportunitiesDetected: 0,
-    opportunitiesApproved: 0,
-    executionsAttempted: 0,
-    executionsSuccessful: 0,
-    totalProfit: 0,
-    successRate: 0,
-    uptime: 0,
-  },
-  settings: {
-    scanInterval: 30,
-    minProfitUSD: 1.0,
-    maxSlippage: 1.0,
-    requireApproval: true,
-  },
-  startTime: Date.now(),
-};
+import { systemState, simulateActivity, addActivity } from './shared-state';
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   // CORS headers
@@ -46,6 +25,11 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   }
 
   if (event.httpMethod === 'GET') {
+    // Simulate activity if system is running
+    if (systemState.running) {
+      simulateActivity();
+    }
+    
     // Calculate uptime
     systemState.stats.uptime = Math.floor((Date.now() - systemState.startTime) / 1000);
 
@@ -67,10 +51,13 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       // Update system state or settings
       if (body.action === 'start') {
         systemState.running = true;
+        addActivity('System', 'System started', 'Multi-agent arbitrage system activated', 'success');
       } else if (body.action === 'stop') {
         systemState.running = false;
+        addActivity('System', 'System stopped', 'Multi-agent arbitrage system deactivated', 'info');
       } else if (body.settings) {
         systemState.settings = { ...systemState.settings, ...body.settings };
+        addActivity('System', 'Settings updated', 'System configuration changed', 'info');
       }
 
       return {

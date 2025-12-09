@@ -4,27 +4,7 @@
  */
 
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-
-const agentStatuses = {
-  ScannerAgent: {
-    name: 'ScannerAgent',
-    status: 'idle',
-    lastActivity: Date.now(),
-    tasksProcessed: 0,
-  },
-  RiskAgent: {
-    name: 'RiskAgent',
-    status: 'idle',
-    lastActivity: Date.now(),
-    tasksProcessed: 0,
-  },
-  ExecutorAgent: {
-    name: 'ExecutorAgent',
-    status: 'idle',
-    lastActivity: Date.now(),
-    tasksProcessed: 0,
-  },
-};
+import { agentStates, systemState, simulateActivity } from './shared-state';
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   const headers = {
@@ -39,13 +19,15 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   }
 
   if (event.httpMethod === 'GET') {
-    // Update last activity for active agents (simulate)
-    const now = Date.now();
+    // Simulate activity if system is running
+    if (systemState.running) {
+      simulateActivity();
+    }
     
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(Object.values(agentStatuses)),
+      body: JSON.stringify(Object.values(agentStates)),
     };
   }
 

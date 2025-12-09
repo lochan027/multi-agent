@@ -4,21 +4,7 @@
  */
 
 import { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
-
-// In-memory opportunities store
-const opportunities = new Map<string, any>();
-
-// Ethereum mainnet token pairs for demo/scanning
-const ETH_TOKEN_PAIRS = [
-  { tokenA: 'WETH', tokenB: 'USDC', profit: 0.0245 },
-  { tokenA: 'WETH', tokenB: 'USDT', profit: 0.0189 },
-  { tokenA: 'WETH', tokenB: 'DAI', profit: 0.0312 },
-  { tokenA: 'WBTC', tokenB: 'USDC', profit: 0.0567 },
-  { tokenA: 'LINK', tokenB: 'USDC', profit: 0.0423 },
-  { tokenA: 'UNI', tokenB: 'USDC', profit: 0.0334 },
-  { tokenA: 'AAVE', tokenB: 'USDC', profit: 0.0289 },
-  { tokenA: 'MKR', tokenB: 'USDC', profit: 0.0445 },
-];
+import { opportunities, systemState, simulateActivity } from './shared-state';
 
 const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   const headers = {
@@ -33,46 +19,15 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   }
 
   if (event.httpMethod === 'GET') {
-    // Generate mock opportunities for demo
-    const mockOpportunities = Array.from(opportunities.values());
-    
-    // If no opportunities, generate some mock ones
-    if (mockOpportunities.length === 0 && Math.random() > 0.3) {
-      const pair = ETH_TOKEN_PAIRS[Math.floor(Math.random() * ETH_TOKEN_PAIRS.length)];
-      const profitVariation = (Math.random() - 0.5) * 0.01;
-      const profit = pair.profit + profitVariation;
-
-      // Generate realistic prices
-      const buyPrice = pair.tokenA === 'WETH' ? 3500 + Math.random() * 100 : 
-                       pair.tokenA === 'WBTC' ? 95000 + Math.random() * 1000 :
-                       10 + Math.random() * 90;
-      const sellPrice = buyPrice * (1 + profit);
-
-      const oppId = `opp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      
-      const opportunity = {
-        id: oppId,
-        tokenPair: `${pair.tokenA}/${pair.tokenB}`,
-        tokenA: pair.tokenA,
-        tokenB: pair.tokenB,
-        buyPrice: Number(buyPrice.toFixed(2)),
-        sellPrice: Number(sellPrice.toFixed(2)),
-        profit: Number((profit * 100).toFixed(3)),
-        profitUSD: Number((buyPrice * profit).toFixed(2)),
-        estimatedGas: Number((50 + Math.random() * 50).toFixed(2)),
-        riskScore: Number((Math.random() * 40 + 20).toFixed(1)),
-        status: 'pending_approval',
-        timestamp: Date.now(),
-        detectedAt: new Date().toISOString(),
-      };
-
-      opportunities.set(oppId, opportunity);
+    // Simulate activity if system is running
+    if (systemState.running) {
+      simulateActivity();
     }
-
+    
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(Array.from(opportunities.values())),
+      body: JSON.stringify(opportunities.slice(0, 20)),
     };
   }
 
@@ -81,11 +36,10 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       const body = JSON.parse(event.body || '{}');
       
       if (body.action === 'approve' && body.opportunityId) {
-        const opp = opportunities.get(body.opportunityId);
-        if (opp) {
-          opp.status = 'approved';
-          opp.approvedAt = new Date().toISOString();
-          opportunities.set(body.opportunityId, opp);
+        const idx = opportunities.findIndex(o => o.id === body.opportunityId);
+        if (idx !== -1) {
+          opportunities[idx].status = 'approved';
+          systemState.stats.opportunitiesApproved++;
         }
         
         return {
@@ -96,7 +50,10 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
       }
 
       if (body.action === 'reject' && body.opportunityId) {
-        opportunities.delete(body.opportunityId);
+        const idx = opportunities.findIndex(o => o.id === body.opportunityId);
+        if (idx !== -1) {
+          opportunities[idx].status = 'rejected';
+        }
         
         return {
           statusCode: 200,
